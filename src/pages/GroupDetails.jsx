@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { getGroup } from '../services/groupService';
 import { useExpenses } from '../hooks/useExpenses';
 import AddExpenseForm from '../components/AddExpenseForm';
+import { calculateBalances } from '../utils/calculateBalances';
+import { simplifyDebts } from '../utils/simplifyDebts';
+import { AuthContext } from '../context/AuthContext';
 
 const GroupDetails = () => {
   const { id } = useParams();
   const location = useLocation();
+  const { currentUser } = useContext(AuthContext);
   
   // Directly extract navigation state avoiding fetching all datasets entirely
   const [currentGroup, setCurrentGroup] = useState(location.state?.group || null);
@@ -17,7 +21,6 @@ const GroupDetails = () => {
   const [showAddForm, setShowAddForm] = useState(false);
 
   useEffect(() => {
-    // If entered manually via URL, explicitly parse the exact document efficiently natively
     if (!currentGroup) {
       const fetchSpecificGroup = async () => {
         try {
@@ -32,6 +35,16 @@ const GroupDetails = () => {
       fetchSpecificGroup();
     }
   }, [id, currentGroup]);
+
+  // Compute total balances utilizing useMemo preventing unnecessary math logic during non-related renders
+  const userBalances = useMemo(() => {
+    return calculateBalances(expenses);
+  }, [expenses]);
+
+  // Derive explicit simplified translations mapping mathematical interactions natively 
+  const simplifiedTransactions = useMemo(() => {
+    return simplifyDebts(userBalances);
+  }, [userBalances]);
 
   if (groupsLoading) {
     return (
@@ -56,6 +69,12 @@ const GroupDetails = () => {
     setShowAddForm(false);
   };
 
+  // Helper fetching email dynamically for display natively mapping from uid
+  const getEmailFromUid = (uid) => {
+    const member = currentGroup.members.find(m => m.uid === uid);
+    return member ? member.email : 'Unknown User';
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-900 text-slate-50">
       <header className="flex items-center justify-between border-b border-slate-700 bg-slate-800 px-4 sm:px-8 py-4 sticky top-0 z-10 shadow-sm">
@@ -72,6 +91,80 @@ const GroupDetails = () => {
       
       <main className="mx-auto w-full max-w-[1000px] flex-1 p-4 sm:p-8">
         
+        {/* Balances Section */}
+        {expenses.length > 0 && (
+           <div className="mb-8 rounded-xl border border-slate-700 bg-slate-800 shadow-xl overflow-hidden animate-[fadeIn_0.3s_ease-out]">
+              <div className="bg-slate-800/80 px-6 py-4 border-b border-slate-700">
+                 <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                    <span className="text-indigo-400">📊</span> Group Balances
+                 </h2>
+              </div>
+              <div className="p-6">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {Object.keys(userBalances).length === 0 ? (
+                    <div className="text-slate-400 text-sm">Everyone is fully settled!</div>
+                  ) : (
+                    Object.entries(userBalances).map(([uid, balance]) => {
+                      if (Math.abs(balance) < 0.01) return null; // Avoid 0.00 floats completely
+
+                      const isPositive = balance > 0;
+                      const isCurrentUser = currentUser?.uid === uid;
+                      const displayName = isCurrentUser ? 'You' : getEmailFromUid(uid);
+                      
+                      return (
+                        <div key={uid} className={`rounded-lg border p-4 ${isPositive ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-rose-500/30 bg-rose-500/10'}`}>
+                           <p className="text-sm font-medium text-slate-300 truncate mb-1" title={getEmailFromUid(uid)}>
+                             {displayName}
+                           </p>
+                           <p className={`text-lg font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                             {isCurrentUser 
+                               ? (isPositive ? `You should receive ₹${Math.abs(balance).toFixed(2)}` : `You owe ₹${Math.abs(balance).toFixed(2)}`)
+                               : (isPositive ? `should receive ₹${Math.abs(balance).toFixed(2)}` : `owes ₹${Math.abs(balance).toFixed(2)}`)
+                             }
+                           </p>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+           </div>
+        )}
+
+        {/* Simplified Debts Section */}
+        {simplifiedTransactions.length > 0 && (
+           <div className="mb-10 rounded-xl border border-slate-700 bg-slate-800 shadow-xl overflow-hidden animate-[fadeIn_0.3s_ease-out]">
+              <div className="bg-slate-800/80 px-6 py-4 border-b border-slate-700">
+                 <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                    <span className="text-rose-400">💸</span> How to Settle Up
+                 </h2>
+              </div>
+              <div className="p-6">
+                 <div className="flex flex-col gap-3">
+                    {simplifiedTransactions.map((t, index) => {
+                       const isCurrentUserFrom = t.from === currentUser?.uid;
+                       const isCurrentUserTo = t.to === currentUser?.uid;
+                       
+                       const fromName = isCurrentUserFrom ? "You" : getEmailFromUid(t.from);
+                       const toName = isCurrentUserTo ? "You" : getEmailFromUid(t.to);
+                       
+                       return (
+                         <div key={index} className="flex items-center justify-between p-4 rounded-lg bg-slate-900 border border-slate-700 transition-colors hover:border-slate-600">
+                            <div className="flex items-center gap-2 text-sm sm:text-base">
+                              <span className={`font-medium ${isCurrentUserFrom ? 'text-rose-400' : 'text-slate-300'}`}>{fromName}</span>
+                              <span className="text-slate-500 mx-1 text-sm">pay{isCurrentUserFrom ? '' : 's'}</span>
+                              <span className={`font-medium ${isCurrentUserTo ? 'text-emerald-400' : 'text-slate-300'}`}>{toName}</span>
+                            </div>
+                            <span className="font-bold text-indigo-400">₹{t.amount.toFixed(2)}</span>
+                         </div>
+                       )
+                    })}
+                 </div>
+              </div>
+           </div>
+        )}
+
+        {/* Expenses List Section */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-2xl font-semibold text-slate-100">Expenses</h2>
           {!showAddForm && (
