@@ -90,6 +90,7 @@ const Dashboard = () => {
               <Link 
                 key={group.id} 
                 to={`/groups/${group.id}`}
+                state={{ group }}
                 className="group flex h-32 flex-col justify-between rounded-xl border border-slate-700 bg-slate-800 p-6 transition-all hover:-translate-y-1 hover:border-indigo-500/50 hover:shadow-lg hover:shadow-indigo-500/10 animate-[fadeIn_0.3s_ease-out]"
               >
                 <div>
