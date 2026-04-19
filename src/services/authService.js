@@ -20,6 +20,10 @@ const getFriendlyErrorMessage = (error) => {
       return 'The password must be at least 6 characters.';
     case 'auth/network-request-failed':
       return 'A network error occurred. Please check your connection.';
+    case 'auth/configuration-not-found':
+      return 'Authentication is not configured. Please enable Email/Password sign-in in your Firebase Console under Authentication → Sign-in method.';
+    case 'auth/operation-not-allowed':
+      return 'Email/Password sign-in is disabled. Please enable it in the Firebase Console.';
     default:
       return error.message || 'An unexpected error occurred. Please try again.';
   }

@@ -1,4 +1,4 @@
-import { collection, addDoc, query, where, or, onSnapshot, serverTimestamp, getDoc, doc } from "firebase/firestore";
+import { collection, addDoc, query, where, onSnapshot, serverTimestamp, getDoc, doc } from "firebase/firestore";
 import { db } from "./firebase";
 
 const groupsCollection = collection(db, "groups");
@@ -13,11 +13,15 @@ export const createGroup = async (name, currentUser, membersEmails) => {
       }
       return { uid: `simulated_${email}`, email };
     });
+
+    // Store a flat array of uids for simple, valid Firestore array-contains queries
+    const memberUids = mappedMembers.map(m => m.uid);
     
     const docRef = await addDoc(groupsCollection, {
       name,
       createdBy: currentUser.email,
       members: mappedMembers,
+      memberUids,
       createdAt: serverTimestamp()
     });
     
@@ -29,13 +33,10 @@ export const createGroup = async (name, currentUser, membersEmails) => {
 };
 
 export const subscribeToUserGroups = (currentUser, onUpdate, onError) => {
+  // Query using the flat memberUids array — a single array-contains is valid in Firestore
   const q = query(
-    groupsCollection, 
-    or(
-      where("members", "array-contains", currentUser.email), 
-      where("members", "array-contains", { uid: currentUser.uid, email: currentUser.email }),
-      where("members", "array-contains", { uid: `simulated_${currentUser.email}`, email: currentUser.email })
-    )
+    groupsCollection,
+    where("memberUids", "array-contains", currentUser.uid)
   );
 
   return onSnapshot(q, (querySnapshot) => {

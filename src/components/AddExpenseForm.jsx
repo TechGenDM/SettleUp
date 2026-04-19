@@ -96,7 +96,7 @@ const AddExpenseForm = ({ members, onSubmit, onCancel }) => {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm text-slate-400">Amount ($)</label>
+          <label className="mb-1 block text-sm text-slate-400">Amount (₹)</label>
           <input 
             type="number"
             step="0.01"
