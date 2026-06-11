@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Receipt, IndianRupee, User, Check, Users, Save } from 'lucide-react';
+import { cn } from '../utils/cn';
 
-const AddExpenseForm = ({ members, onSubmit, onCancel }) => {
+const AddExpenseForm = ({ groupMembers, onSubmit, onCancel }) => {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   
-  // Track specific mappings initializing with defaults securely
-  const [paidByUid, setPaidByUid] = useState(members[0]?.uid || '');
-  const [splitBetweenUids, setSplitBetweenUids] = useState(members.map(m => m.uid));
+  const [paidByUid, setPaidByUid] = useState(groupMembers[0]?.uid || '');
+  const [splitBetweenUids, setSplitBetweenUids] = useState(groupMembers.map(m => m.uid));
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -21,7 +23,7 @@ const AddExpenseForm = ({ members, onSubmit, onCancel }) => {
 
   const handleSelectAll = (e) => {
     e.preventDefault();
-    setSplitBetweenUids(members.map(m => m.uid));
+    setSplitBetweenUids(groupMembers.map(m => m.uid));
   };
   
   const handleClearAll = (e) => {
@@ -50,15 +52,15 @@ const AddExpenseForm = ({ members, onSubmit, onCancel }) => {
       return;
     }
 
-    const paidByMember = members.find(m => m.uid === paidByUid);
+    const paidByMember = groupMembers.find(m => m.uid === paidByUid);
     if (!paidByMember) {
       setError("Invalid paid-by member selected.");
       return;
     }
 
     const splitMembers = splitBetweenUids
-      .map(uid => members.find(m => m.uid === uid))
-      .filter(Boolean); // Clean any possible undefined mappings implicitly 
+      .map(uid => groupMembers.find(m => m.uid === uid))
+      .filter(Boolean);
 
     setLoading(true);
     
@@ -76,104 +78,173 @@ const AddExpenseForm = ({ members, onSubmit, onCancel }) => {
   };
 
   return (
-    <div className="mb-8 rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-xl animate-[fadeIn_0.3s_ease-out]">
-      <h3 className="mb-4 text-xl font-bold text-slate-100">Add New Expense</h3>
+    <div className="glass-surface rounded-2xl overflow-hidden p-8 shadow-2xl">
+      <div className="mb-8 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl bg-brand-primary/10 p-2.5">
+            <Receipt className="h-6 w-6 text-brand-primary" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-text-primary">Add Expense</h3>
+            <p className="text-sm text-text-secondary">Keep track of who owes what.</p>
+          </div>
+        </div>
+        <button 
+          onClick={onCancel}
+          className="rounded-full p-2 text-text-muted transition-colors hover:bg-glass-bg hover:text-text-primary"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
       
-      {error && <div className="mb-4 rounded border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-500">{error}</div>}
+      {error && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 rounded-xl border border-error/20 bg-error/10 p-4 text-sm text-error flex items-center gap-2"
+        >
+          <X className="h-4 w-4" />
+          {error}
+        </motion.div>
+      )}
       
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1 block text-sm text-slate-400">Description</label>
-          <input 
-            type="text"
-            required
-            disabled={loading}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="e.g. Dinner at Mario's"
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 p-3 text-slate-50 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm text-slate-400">Amount (₹)</label>
-          <input 
-            type="number"
-            step="0.01"
-            min="0.01"
-            required
-            disabled={loading}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 p-3 text-slate-50 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm text-slate-400">Paid By</label>
-          <select 
-            value={paidByUid}
-            onChange={(e) => setPaidByUid(e.target.value)}
-            disabled={loading}
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 p-3 text-slate-50 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors cursor-pointer"
-          >
-            {members.map(member => (
-              <option key={`paidby-${member.uid}`} value={member.uid}>
-                {member.email}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <label className="block text-sm text-slate-400">Split Between</label>
-            <div className="flex gap-2 text-xs">
-               <button onClick={handleSelectAll} disabled={loading} className="text-indigo-400 hover:text-indigo-300">All</button>
-               <span className="text-slate-600">|</span>
-               <button onClick={handleClearAll} disabled={loading} className="text-indigo-400 hover:text-indigo-300">None</button>
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-text-secondary">Description</label>
+            <div className="relative">
+              <input 
+                type="text"
+                required
+                disabled={loading}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What was it for?"
+                className="w-full rounded-xl border border-glass-border bg-bg-secondary p-3 text-text-primary outline-none transition-all placeholder:text-text-muted focus:border-brand-primary/50 focus:bg-bg-primary focus:ring-2 focus:ring-brand-primary/20"
+              />
             </div>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2 rounded-lg border border-slate-700 bg-slate-900 p-4 max-h-48 overflow-y-auto">
-            {members.map(member => (
-              <label 
-                key={`split-${member.uid}`} 
-                className={`flex cursor-pointer items-center gap-3 rounded border p-2 transition-colors ${splitBetweenUids.includes(member.uid) ? 'border-indigo-500/50 bg-indigo-500/10' : 'border-slate-700 hover:bg-slate-800'}`}
-              >
-                <input 
-                  type="checkbox"
-                  checked={splitBetweenUids.includes(member.uid)}
-                  onChange={() => handleToggleSplit(member.uid)}
-                  disabled={loading}
-                  className="rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 cursor-pointer"
-                />
-                <span className="text-sm text-slate-300 truncate">{member.email}</span>
-              </label>
-            ))}
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-text-secondary">Amount</label>
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <IndianRupee className="h-4 w-4 text-text-muted" />
+              </div>
+              <input 
+                type="number"
+                step="0.01"
+                min="0.01"
+                required
+                disabled={loading}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full rounded-xl border border-glass-border bg-bg-secondary p-3 pl-9 text-text-primary outline-none transition-all placeholder:text-text-muted focus:border-brand-primary/50 focus:bg-bg-primary focus:ring-2 focus:ring-brand-primary/20"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-700">
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-text-secondary">Who paid?</label>
+          <div className="relative">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <User className="h-4 w-4 text-text-muted" />
+            </div>
+            <select 
+              value={paidByUid}
+              onChange={(e) => setPaidByUid(e.target.value)}
+              disabled={loading}
+              className="w-full appearance-none rounded-xl border border-glass-border bg-bg-secondary p-3 pl-9 text-text-primary outline-none transition-all focus:border-brand-primary/50 focus:bg-bg-primary focus:ring-2 focus:ring-brand-primary/20"
+            >
+              {groupMembers.map(member => (
+                <option key={`paidby-${member.uid}`} value={member.uid} className="bg-bg-secondary text-text-primary">
+                  {member.email}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-text-secondary">Split between</label>
+            <div className="flex gap-4">
+              <button 
+                type="button"
+                onClick={handleSelectAll} 
+                disabled={loading} 
+                className="text-xs font-semibold text-brand-primary hover:text-brand-secondary uppercase tracking-wider"
+              >
+                Select All
+              </button>
+              <button 
+                type="button"
+                onClick={handleClearAll} 
+                disabled={loading} 
+                className="text-xs font-semibold text-text-muted hover:text-text-secondary uppercase tracking-wider"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+          
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {groupMembers.map(member => {
+              const isSelected = splitBetweenUids.includes(member.uid);
+              return (
+                <label 
+                  key={`split-${member.uid}`} 
+                  className={cn(
+                    "relative flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-all",
+                    isSelected 
+                      ? "border-brand-primary/50 bg-brand-primary/10 text-text-primary shadow-lg" 
+                      : "border-glass-border bg-bg-secondary text-text-secondary hover:bg-glass-bg hover:text-text-primary"
+                  )}
+                >
+                  <div className={cn(
+                    "flex h-5 w-5 items-center justify-center rounded-md border transition-all",
+                    isSelected ? "border-brand-primary bg-brand-primary text-white" : "border-glass-border"
+                  )}>
+                    {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
+                  </div>
+                  <input 
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => handleToggleSplit(member.uid)}
+                    disabled={loading}
+                    className="sr-only"
+                  />
+                  <span className="text-xs font-medium truncate">{member.email.split('@')[0]}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex gap-4 pt-4 border-t border-glass-border">
           <button 
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="rounded-lg px-4 py-2 font-medium text-slate-400 transition-colors hover:text-slate-200"
+            className="flex-1 rounded-xl border border-glass-border bg-transparent px-6 py-3 font-semibold text-text-secondary transition-all hover:bg-glass-bg hover:text-text-primary"
           >
             Cancel
           </button>
           <button 
             type="submit"
-            disabled={loading || description.trim().length === 0 || amount.length === 0}
-            className="flex items-center justify-center rounded-lg bg-indigo-600 px-6 py-2 font-medium text-white transition-all hover:bg-indigo-700 disabled:opacity-50"
+            disabled={loading || !description.trim() || !amount}
+            className="flex flex-[2] items-center justify-center gap-2 rounded-xl bg-brand-primary px-6 py-3 font-semibold text-white shadow-lg transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
           >
             {loading ? (
-                <div className="flex items-center gap-2">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-100/30 border-t-white"></div>
-                  <span>Saving...</span>
-                </div>
-            ) : 'Save Expense'}
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Save Expense
+              </>
+            )}
           </button>
         </div>
       </form>

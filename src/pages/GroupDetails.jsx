@@ -1,5 +1,10 @@
-import React, { useState, useEffect, useMemo, useContext, useCallback, memo } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useContext, useCallback, memo, useRef } from 'react';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  ArrowLeft, Plus, Receipt, User as UserIcon, Calendar, CheckCircle2, AlertCircle,
+  Activity, ArrowRightLeft, AlignLeft, Users
+} from 'lucide-react';
 import { getGroup } from '../services/groupService';
 import { useExpenses } from '../hooks/useExpenses';
 import AddExpenseForm from '../components/AddExpenseForm';
@@ -7,251 +12,268 @@ import { calculateBalances } from '../utils/calculateBalances';
 import { simplifyDebts } from '../utils/simplifyDebts';
 import { AuthContext } from '../context/AuthContext';
 import { ExpenseItemSkeleton, BalanceCardSkeleton } from '../components/Skeletons';
+import GlassCard from '../components/ui/GlassCard';
+import CustomButton from '../components/ui/CustomButton';
+import SettlementFlow from '../components/ui/SettlementFlow';
+import { cn } from '../utils/cn';
 
-// PERF: memo'd so it only re-renders when its own expense data ref changes,
-// not when unrelated GroupDetails state (e.g. showAddForm) changes.
+/* ── Expense Item (Linear Style) ── */
 const ExpenseItem = memo(({ exp }) => (
-  <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-slate-700 bg-slate-800 p-5 transition-all hover:border-slate-600 hover:shadow-md animate-[fadeIn_0.3s_ease-out] ${exp._isOptimistic ? 'opacity-60' : ''}`}>
-    <div className="flex flex-col">
-      <span className="text-lg font-semibold text-slate-100 mb-1">
-        {exp.description}
-        {exp._isOptimistic && <span className="ml-2 text-xs font-normal text-slate-500">Saving…</span>}
-      </span>
-      <div className="text-sm text-slate-400 flex items-center gap-1.5">
-        <span className="font-medium text-slate-300">Paid by:</span>
-        <span className="bg-slate-900 px-2 py-0.5 rounded text-xs border border-slate-700">{exp.paidBy.email}</span>
+  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:px-4 sm:py-3 border-b border-border last:border-0 hover:bg-bg-hover transition-colors group cursor-pointer">
+    <div className="flex items-start gap-3">
+      <div className="mt-0.5 h-7 w-7 rounded bg-bg-primary border border-border flex items-center justify-center flex-shrink-0 text-text-muted group-hover:text-text-primary group-hover:border-text-muted transition-colors">
+        <Receipt size={14} strokeWidth={1.5} />
       </div>
-      <div className="text-xs text-slate-500 mt-2">
-        Split between {exp.splitBetween.length} member{exp.splitBetween.length !== 1 && 's'}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h4 className="text-[14px] font-semibold text-text-primary group-hover:text-brand-primary transition-colors truncate">
+            {exp.description}
+          </h4>
+          {exp._isOptimistic && (
+            <span className="text-[10px] font-medium text-warning bg-warning/10 px-1.5 py-0.5 rounded uppercase tracking-widest">
+              Saving…
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[12px] text-text-secondary">
+          <span className="flex items-center gap-1">
+            <UserIcon size={12} strokeWidth={1.5} />
+            <span className="font-medium">{exp.paidBy.email.split('@')[0]}</span> paid
+          </span>
+          <span className="flex items-center gap-1">
+            <Users size={12} strokeWidth={1.5} />
+            {exp.splitBetween.length} split
+          </span>
+          <span className="flex items-center gap-1 text-text-muted">
+            <Calendar size={12} strokeWidth={1.5} />
+            {exp.createdAt?.seconds
+              ? new Date(exp.createdAt.seconds * 1000).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
+              : 'Just now'}
+          </span>
+        </div>
       </div>
     </div>
-    <div className="flex justify-end border-t border-slate-700 sm:border-0 pt-3 sm:pt-0 mt-2 sm:mt-0">
-      <div className="text-2xl font-bold text-emerald-400">
-        ₹{exp.amount.toFixed(2)}
-      </div>
+    <div className="text-[14px] font-semibold text-text-primary tabular sm:text-right flex-shrink-0 mt-2 sm:mt-0">
+      ₹{exp.amount.toFixed(2)}
     </div>
   </div>
 ));
-
 ExpenseItem.displayName = 'ExpenseItem';
 
-// Skeleton rows shown while the first Firestore snapshot is in-flight
-const ExpenseListSkeleton = () => (
-  <div className="flex flex-col gap-3">
-    {[0, 1, 2].map(i => <ExpenseItemSkeleton key={i} />)}
-  </div>
-);
-
+/* ── GroupDetails ── */
 const GroupDetails = () => {
   const { id } = useParams();
   const location = useLocation();
   const { currentUser } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   const [currentGroup, setCurrentGroup] = useState(location.state?.group || null);
   const [groupsLoading, setGroupsLoading] = useState(!currentGroup);
   const [groupError, setGroupError] = useState(null);
 
-  const { expenses, loading: expensesLoading, error: expensesError, addExpense } = useExpenses(id);
+  const { expenses, loading: expensesLoading, addExpense } = useExpenses(id);
   const [showAddForm, setShowAddForm] = useState(false);
+  const hasFetched = useRef(false);
 
   useEffect(() => {
-    // Only fetch if we don't already have the group (passed via navigation state)
-    if (!currentGroup) {
-      const fetchSpecificGroup = async () => {
-        try {
-          const groupData = await getGroup(id);
-          setCurrentGroup(groupData);
-        } catch (err) {
-          setGroupError(err.message);
-        } finally {
-          setGroupsLoading(false);
-        }
-      };
-      fetchSpecificGroup();
-    }
-  }, [id, currentGroup]);
+    if (currentGroup || hasFetched.current) return;
+    hasFetched.current = true;
+    (async () => {
+      try { setCurrentGroup(await getGroup(id)); }
+      catch (err) { setGroupError(err.message); }
+      finally { setGroupsLoading(false); }
+    })();
+  }, [id]);
 
-  // PERF: useMemo ensures calculateBalances (O(n) loop) and simplifyDebts only
-  // run when the expenses array reference actually changes — not on every render.
   const userBalances = useMemo(() => calculateBalances(expenses), [expenses]);
   const simplifiedTransactions = useMemo(() => simplifyDebts(userBalances), [userBalances]);
-
-  // PERF: useCallback gives stable references to all event handlers so memo'd
-  // children (AddExpenseForm) don't re-render on unrelated parent state changes.
-  const handleShowForm = useCallback(() => setShowAddForm(true), []);
-  const handleHideForm = useCallback(() => setShowAddForm(false), []);
+  const userNetPosition = useMemo(() => currentUser ? (userBalances[currentUser.uid] || 0) : 0, [userBalances, currentUser]);
 
   const handleCreateExpense = useCallback(async (payload) => {
     await addExpense(payload);
     setShowAddForm(false);
   }, [addExpense]);
 
-  // PERF: Memoize this lookup so it doesn't regenerate a closure on every render
   const getEmailFromUid = useCallback((uid) => {
-    const member = currentGroup?.members.find(m => m.uid === uid);
-    return member ? member.email : 'Unknown User';
+    const m = currentGroup?.members.find(m => m.uid === uid);
+    return m ? m.email : 'Unknown';
   }, [currentGroup]);
 
   if (groupsLoading) {
     return (
-      <div className="flex min-h-screen flex-col bg-slate-900 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-700 border-t-indigo-500" />
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-text-primary" />
       </div>
     );
   }
 
   if (groupError || !currentGroup) {
     return (
-      <div className="flex min-h-screen flex-col bg-slate-900 text-slate-50 items-center justify-center p-8 text-center">
-        <h2 className="text-2xl font-bold text-slate-400 mb-4">Group Not Found</h2>
-        <p className="text-slate-500 mb-6">{groupError || "This group doesn't exist or you don't have access to it."}</p>
-        <Link to="/dashboard" className="text-indigo-500 hover:text-indigo-400">Return to Dashboard</Link>
+      <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center p-8 text-center">
+        <AlertCircle size={24} className="text-error mb-4" strokeWidth={1.5} />
+        <h2 className="text-[16px] font-semibold text-text-primary mb-2">Group Not Found</h2>
+        <p className="text-[13px] text-text-secondary mb-6 max-w-sm">{groupError || "This group doesn't exist or you don't have access."}</p>
+        <CustomButton variant="secondary" onClick={() => navigate('/dashboard')}>
+          Back to Dashboard
+        </CustomButton>
       </div>
     );
   }
 
+  const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
+
   return (
-    <div className="flex min-h-screen flex-col bg-slate-900 text-slate-50">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-700 bg-slate-800 px-4 sm:px-8 py-4 shadow-sm">
-        <div className="flex items-center gap-4">
-          <Link to="/dashboard" className="rounded bg-slate-700 px-3 py-1 text-sm font-medium text-slate-300 hover:bg-slate-600 transition-colors">
-            ← Back
-          </Link>
-          <h1 className="max-w-[150px] truncate text-xl font-bold text-indigo-400 sm:max-w-md">{currentGroup.name}</h1>
-        </div>
-        <div className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-400">
-          {currentGroup.members.length} Members
+    <div className="min-h-screen bg-bg-primary flex flex-col">
+
+      {/* ── HEADER (Ultra-minimal) ── */}
+      <header className="sticky top-0 z-50 bg-bg-secondary border-b border-border">
+        <div className="mx-auto max-w-[1100px] px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link to="/dashboard" className="text-text-muted hover:text-text-primary transition-colors">
+              <ArrowLeft size={16} strokeWidth={2} />
+            </Link>
+            <span className="text-border">/</span>
+            <span className="text-[14px] font-semibold text-text-primary tracking-tight truncate max-w-[200px] sm:max-w-xs">
+              {currentGroup.name}
+            </span>
+            <span className="hidden sm:inline-flex px-1.5 py-0.5 rounded bg-bg-primary border border-border text-[10px] font-medium text-text-secondary">
+              {currentGroup.members.length} members
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-2 text-[12px]">
+              <span className="text-text-secondary">Your Net:</span>
+              <span className={cn('font-semibold', userNetPosition > 0 ? 'text-success' : userNetPosition < 0 ? 'text-error' : 'text-text-primary')}>
+                {userNetPosition > 0 ? '+' : ''}₹{Math.abs(userNetPosition).toFixed(2)}
+              </span>
+            </div>
+            <div className="h-4 w-px bg-border hidden sm:block" />
+            <CustomButton onClick={() => setShowAddForm(true)} icon={Plus}>
+              New Expense
+            </CustomButton>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1000px] flex-1 p-4 sm:p-8">
-
-        {/* Group Balances Section — only shown when there are expenses */}
-        {expensesLoading ? (
-          // SKELETON: Show balance card placeholders so the layout doesn't jump
-          <div className="mb-8 rounded-xl border border-slate-700 bg-slate-800 overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-700">
-              <div className="animate-pulse h-6 w-40 rounded bg-slate-700" />
-            </div>
-            <div className="p-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {[0, 1, 2].map(i => <BalanceCardSkeleton key={i} />)}
-            </div>
-          </div>
-        ) : expenses.length > 0 && (
-          <div className="mb-8 rounded-xl border border-slate-700 bg-slate-800 shadow-xl overflow-hidden animate-[fadeIn_0.3s_ease-out]">
-            <div className="border-b border-slate-700 bg-slate-800/80 px-6 py-4">
-              <h2 className="flex items-center gap-2 text-xl font-bold text-slate-100">
-                <span className="text-indigo-400">📊</span> Group Balances
-              </h2>
-            </div>
-            <div className="p-6">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {Object.keys(userBalances).length === 0 ? (
-                  <div className="text-slate-400 text-sm">Everyone is fully settled!</div>
-                ) : (
-                  Object.entries(userBalances).map(([uid, balance]) => {
-                    if (Math.abs(balance) < 0.01) return null;
-                    const isPositive = balance > 0;
-                    const isCurrentUser = currentUser?.uid === uid;
-                    const displayName = isCurrentUser ? 'You' : getEmailFromUid(uid);
-                    return (
-                      <div key={uid} className={`rounded-lg border p-4 ${isPositive ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-rose-500/30 bg-rose-500/10'}`}>
-                        <p className="mb-1 truncate text-sm font-medium text-slate-300" title={getEmailFromUid(uid)}>{displayName}</p>
-                        <p className={`text-lg font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {isCurrentUser
-                            ? (isPositive ? `You should receive ₹${Math.abs(balance).toFixed(2)}` : `You owe ₹${Math.abs(balance).toFixed(2)}`)
-                            : (isPositive ? `should receive ₹${Math.abs(balance).toFixed(2)}` : `owes ₹${Math.abs(balance).toFixed(2)}`)}
-                        </p>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* How to Settle Up Section */}
-        {!expensesLoading && simplifiedTransactions.length > 0 && (
-          <div className="mb-10 rounded-xl border border-slate-700 bg-slate-800 shadow-xl overflow-hidden animate-[fadeIn_0.3s_ease-out]">
-            <div className="border-b border-slate-700 bg-slate-800/80 px-6 py-4">
-              <h2 className="flex items-center gap-2 text-xl font-bold text-slate-100">
-                <span className="text-rose-400">💸</span> How to Settle Up
-              </h2>
-            </div>
-            <div className="p-6">
-              <div className="flex flex-col gap-3">
-                {simplifiedTransactions.map((t, index) => {
-                  const isCurrentUserFrom = t.from === currentUser?.uid;
-                  const isCurrentUserTo = t.to === currentUser?.uid;
-                  const fromName = isCurrentUserFrom ? 'You' : getEmailFromUid(t.from);
-                  const toName = isCurrentUserTo ? 'You' : getEmailFromUid(t.to);
-                  return (
-                    <div key={index} className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900 p-4 transition-colors hover:border-slate-600">
-                      <div className="flex items-center gap-2 text-sm sm:text-base">
-                        <span className={`font-medium ${isCurrentUserFrom ? 'text-rose-400' : 'text-slate-300'}`}>{fromName}</span>
-                        <span className="mx-1 text-sm text-slate-500">pay{isCurrentUserFrom ? '' : 's'}</span>
-                        <span className={`font-medium ${isCurrentUserTo ? 'text-emerald-400' : 'text-slate-300'}`}>{toName}</span>
-                      </div>
-                      <span className="font-bold text-indigo-400">₹{t.amount.toFixed(2)}</span>
+      <main className="flex-1 mx-auto max-w-[1100px] w-full px-6 py-8">
+        
+        {/* ── 2-Col Layout ── */}
+        <div className="flex flex-col lg:flex-row gap-8 items-start">
+          
+          {/* Left: Balances & Ledger (The most important flow) */}
+          <div className="w-full lg:w-[320px] flex-shrink-0 space-y-6">
+            
+            {/* Balances Board */}
+            <div>
+              <h3 className="text-[12px] font-semibold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2">
+                <AlignLeft size={14} /> Balances
+              </h3>
+              
+              <GlassCard className="overflow-hidden">
+                <div className="bg-bg-primary px-4 py-3 border-b border-border flex items-center justify-between">
+                  <span className="text-[13px] font-semibold text-text-primary">Total Group Spend</span>
+                  <span className="text-[14px] font-bold tabular text-text-primary">₹{totalSpent.toFixed(2)}</span>
+                </div>
+                
+                <div className="p-2">
+                  {expensesLoading ? (
+                    <div className="p-4"><BalanceCardSkeleton /></div>
+                  ) : Object.keys(userBalances).length === 0 ? (
+                    <div className="flex flex-col items-center py-6 text-center">
+                      <CheckCircle2 size={20} className="text-success mb-2" strokeWidth={1.5} />
+                      <p className="text-[13px] font-medium text-text-secondary">All settled up!</p>
                     </div>
-                  );
-                })}
-              </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {Object.entries(userBalances).map(([uid, balance]) => {
+                        if (Math.abs(balance) < 0.01) return null;
+                        const isPos = balance > 0;
+                        const isMe = currentUser?.uid === uid;
+                        const name = isMe ? 'You' : getEmailFromUid(uid).split('@')[0];
+                        return (
+                          <div key={uid} className="flex items-center justify-between p-2 rounded-md hover:bg-bg-primary transition-colors">
+                            <div className="flex items-center gap-2.5">
+                              <div className={cn(
+                                'h-6 w-6 rounded flex items-center justify-center text-[11px] font-bold',
+                                isPos ? 'bg-success-bg text-success' : 'bg-error-bg text-error'
+                              )}>
+                                {name.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="text-[13px] font-medium text-text-primary">{name}</span>
+                            </div>
+                            <span className={cn('text-[13px] font-semibold tabular', isPos ? 'text-success' : 'text-error')}>
+                              {isPos ? '+' : '-'}₹{Math.abs(balance).toFixed(2)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </GlassCard>
             </div>
-          </div>
-        )}
 
-        {/* Expenses List Section */}
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-semibold text-slate-100">Expenses</h2>
-          {!showAddForm && (
-            <button
-              onClick={handleShowForm}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-md transition-all hover:bg-indigo-700 hover:shadow-indigo-500/20 active:scale-[0.98]"
-            >
-              + Add Expense
-            </button>
-          )}
-        </div>
-
-        {showAddForm && (
-          <AddExpenseForm
-            members={currentGroup.members}
-            onSubmit={handleCreateExpense}
-            onCancel={handleHideForm}
-          />
-        )}
-
-        {expensesError && (
-          <div className="mb-6 rounded-lg border border-red-500/20 bg-red-500/10 p-4 font-medium text-red-500">
-            {expensesError}
-          </div>
-        )}
-
-        {/* SKELETON: Expense rows while first snapshot loads */}
-        {expensesLoading ? (
-          <ExpenseListSkeleton />
-        ) : expenses.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-700 bg-slate-800/50 p-12 text-center animate-[fadeIn_0.5s_ease-out]">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-700 text-2xl">💸</div>
-            <h3 className="mb-2 text-lg font-medium text-slate-200">No Expenses Yet</h3>
-            <p className="mx-auto mb-4 max-w-md text-sm text-slate-500">No expenses yet. Add your first expense.</p>
-            {!showAddForm && (
-              <button onClick={handleShowForm} className="mt-2 text-sm font-medium text-indigo-400 hover:text-indigo-300 hover:underline">
-                + Add Expense
-              </button>
+            {/* Optimal Settlement */}
+            {!expensesLoading && simplifiedTransactions.length > 0 && (
+              <div>
+                <SettlementFlow
+                  transactions={simplifiedTransactions}
+                  getEmailFromUid={getEmailFromUid}
+                />
+              </div>
             )}
           </div>
-        ) : (
-          // PERF: Each ExpenseItem is memo'd, so only items whose data changed
-          // will re-render when a new expense arrives via onSnapshot.
-          <div className="flex flex-col gap-3">
-            {expenses.map(exp => (
-              <ExpenseItem key={exp.id} exp={exp} />
-            ))}
+
+          {/* Right: Expenses List */}
+          <div className="flex-1 w-full min-w-0">
+            <h3 className="text-[12px] font-semibold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2">
+              <Activity size={14} /> Expense Ledger
+            </h3>
+
+            <AnimatePresence>
+              {showAddForm && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden mb-6"
+                >
+                  <AddExpenseForm
+                    groupMembers={currentGroup.members}
+                    onSubmit={handleCreateExpense}
+                    onCancel={() => setShowAddForm(false)}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <GlassCard className="overflow-hidden">
+              {expensesLoading ? (
+                <div className="p-4 space-y-4">
+                  {[0, 1, 2].map(i => <ExpenseItemSkeleton key={i} />)}
+                </div>
+              ) : expenses.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <Receipt size={24} className="text-text-muted mb-3" strokeWidth={1.5} />
+                  <h3 className="text-[14px] font-semibold text-text-primary mb-1">No expenses yet</h3>
+                  <p className="text-[13px] text-text-secondary mb-4 max-w-[250px]">
+                    Record your first expense to begin tracking balances.
+                  </p>
+                  <CustomButton variant="secondary" onClick={() => setShowAddForm(true)} icon={Plus}>
+                    Add expense
+                  </CustomButton>
+                </div>
+              ) : (
+                <div className="flex flex-col">
+                  {expenses.map((exp) => (
+                    <ExpenseItem key={exp.id} exp={exp} />
+                  ))}
+                </div>
+              )}
+            </GlassCard>
           </div>
-        )}
+        </div>
       </main>
     </div>
   );

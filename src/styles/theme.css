@@ -1,0 +1,83 @@
+:root {
+  /* ── Backgrounds ── */
+  --bg-primary: #F7F8FA;
+  --bg-secondary: #FFFFFF;
+  --bg-hover: #F3F4F6;
+  --bg-active: #E5E7EB;
+
+  /* ── Brand Colors (Linear-inspired Indigo) ── */
+  --brand-primary: #5E6AD2;
+  --brand-hover: #4B55B0;
+  --brand-secondary: #E2E4F9;
+
+  /* ── Status ── */
+  --success: #28A745;
+  --success-bg: #EAF6EC;
+  --error: #DC3545;
+  --error-bg: #FCEBEA;
+  --warning: #F5A623;
+
+  /* ── Text ── */
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-muted: #9CA3AF;
+
+  /* ── Surfaces / Glass ── */
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-blur: 12px;
+
+  /* ── Border ── */
+  --border-default: #E5E7EB;
+  --border-subtle: #F3F4F6;
+
+  /* ── Shadows (Linear style: sharp, borderline, no fuzz) ── */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+  --shadow-card: 0 0 0 1px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.05);
+  --shadow-card-hover: 0 0 0 1px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.06);
+}
+
+/* ─────────── Base layer ─────────── */
+@layer base {
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    /* Typography perfections */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    letter-spacing: -0.01em;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+
+  .tabular { font-variant-numeric: tabular-nums; }
+}
+
+/* ─────────── Component layer ─────────── */
+@layer components {
+
+  /* Sticky precise header */
+  .glass-surface {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  /* Card depth shadows */
+  .shadow-card { box-shadow: var(--shadow-card); }
+  .shadow-card-md { box-shadow: var(--shadow-card-hover); }
+  
+  /* Brand buttons */
+  .shadow-glow-primary {
+    /* No big glow, just a precise inner inset for depth and a slight drop */
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.15);
+  }
+}

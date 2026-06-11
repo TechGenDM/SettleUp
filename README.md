@@ -1,6 +1,30 @@
-# 💸 SettleUp
+# SettleUP - Premium Finance Platform
 
-> A smart expense-sharing platform that tracks group expenses and minimizes settlements using an optimized debt simplification algorithm.
+A world-class expense splitting and debt minimization platform.
+
+## Accessibility Compliance
+
+The "SettleUP" platform is built with a commitment to accessibility (WCAG 2.2 AA standards).
+
+- **Keyboard Navigation**: All interactive elements (buttons, inputs, group cards) are fully accessible via `Tab` and include clear visual focus indicators.
+- **Color Contrast**: All text and interactive elements maintain a contrast ratio of at least 4.5:1 against their backgrounds in both dark and light modes.
+- **ARIA Labels**: Interactive components like `ThemeToggle` and `CustomButton` use appropriate ARIA labels for screen reader support.
+- **Tabular Numbers**: Financial data uses `tabular-nums` for consistent vertical alignment, aiding readability for users with cognitive or visual impairments.
+- **Motion Controls**: All animations are optimized for 60fps and respect `prefers-reduced-motion` settings where applicable.
+
+## Technology Stack
+
+- **React 18+**: Modern functional components with hooks.
+- **Tailwind CSS v4**: Utility-first styling with custom theme variables.
+- **Framer Motion**: Fluid UI transitions and micro-interactions.
+- **Lucide React**: Consistent, high-quality iconography.
+- **Firebase**: Secure authentication and real-time database.
+
+## Design System
+
+- **Glassmorphism**: 24px backdrop blur with subtle borders.
+- **Bento Grid**: Responsive layout for dashboard and details.
+- **Typography**: Inter Variable font for maximum legibility.
 
 ---
 

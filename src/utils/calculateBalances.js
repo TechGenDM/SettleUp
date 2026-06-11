@@ -27,9 +27,9 @@ export const calculateBalances = (expenses) => {
       balances[member.uid] = (balances[member.uid] || 0) - userShare;
     });
 
-    // Credit the individual who resolved the total balance proactively
+    // Credit the individual who resolved the total balance proactively (using cents-rounded value for consistency)
     if (paidBy && paidBy.uid) {
-      balances[paidBy.uid] = (balances[paidBy.uid] || 0) + amount;
+      balances[paidBy.uid] = (balances[paidBy.uid] || 0) + amountInCents / 100;
     }
   });
 

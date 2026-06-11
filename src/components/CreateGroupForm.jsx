@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, UserPlus, Trash2, Send } from 'lucide-react';
+import { cn } from '../utils/cn';
 
 const CreateGroupForm = ({ onSubmit, onCancel }) => {
   const [name, setName] = useState('');
@@ -45,97 +48,126 @@ const CreateGroupForm = ({ onSubmit, onCancel }) => {
     setError(null);
     try {
       await onSubmit(name.trim(), members);
-      // Execution hands gracefully back resolving external variables securely
-    } catch (err) {
+    } catch (err) { 
       setError(err.message);
       setLoading(false);
     }
   };
 
   return (
-    <div className="animate-[fadeIn_0.2s_ease-out] rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-xl">
-      <h3 className="mb-4 text-xl font-bold text-slate-100">Create New Group</h3>
+    <div className="glass-surface rounded-2xl overflow-hidden p-8 shadow-2xl">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h3 className="text-xl font-bold text-text-primary">Create New Group</h3>
+          <p className="text-sm text-text-secondary">Add friends and start splitting expenses.</p>
+        </div>
+        <button 
+          onClick={onCancel}
+          className="rounded-full p-2 text-text-muted transition-colors hover:bg-glass-bg hover:text-text-primary"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
       
-      {error && <div className="mb-4 rounded border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-500">{error}</div>}
+      {error && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 rounded-xl border border-error/20 bg-error/10 p-4 text-sm text-error"
+        >
+          {error}
+        </motion.div>
+      )}
       
-      <form onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <label className="mb-1 block text-sm text-slate-400">Group Name</label>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label className="mb-2 block text-sm font-medium text-text-secondary">Group Name</label>
           <input 
             type="text"
             required
             value={name}
             onChange={(e) => { setName(e.target.value); setError(null); }}
             disabled={loading}
-            placeholder="e.g. Trip to Hawaii"
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 p-3 text-slate-50 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            placeholder="e.g. Weekend Trip, Flatmates"
+            className="w-full rounded-xl border border-glass-border bg-bg-secondary p-3 text-text-primary outline-none transition-all placeholder:text-text-muted focus:border-brand-primary/50 focus:bg-bg-primary focus:ring-2 focus:ring-brand-primary/20"
           />
         </div>
 
-        <div className="mb-4">
-          <label className="mb-1 block text-sm text-slate-400">Add Members (Emails)</label>
+        <div>
+          <label className="mb-2 block text-sm font-medium text-text-secondary">Add Members</label>
           <div className="flex gap-2">
-            <input 
-              type="email"
-              value={emailInput}
-              onChange={(e) => { setEmailInput(e.target.value); setError(null); }}
-              disabled={loading}
-              placeholder="friend@example.com"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleAddMember();
-                }
-              }}
-              className="flex-1 rounded-lg border border-slate-700 bg-slate-900 p-3 text-slate-50 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-            />
+            <div className="relative flex-1">
+              <input 
+                type="email"
+                value={emailInput}
+                onChange={(e) => { setEmailInput(e.target.value); setError(null); }}
+                disabled={loading}
+                placeholder="friend@example.com"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddMember();
+                  }
+                }}
+                className="w-full rounded-xl border border-glass-border bg-bg-secondary p-3 text-text-primary outline-none transition-all placeholder:text-text-muted focus:border-brand-primary/50 focus:bg-bg-primary focus:ring-2 focus:ring-brand-primary/20"
+              />
+            </div>
             <button 
               type="button"
               onClick={handleAddMember}
               disabled={loading || !emailInput.trim()}
-              className="rounded-lg bg-slate-700 px-5 py-2 font-medium text-slate-200 transition-colors hover:bg-slate-600 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-xl bg-bg-secondary border border-glass-border px-6 py-3 font-semibold text-text-primary transition-all hover:bg-glass-bg disabled:opacity-50"
             >
+              <UserPlus className="h-4 w-4" />
               Add
             </button>
           </div>
           
-          {members.length > 0 && (
-             <div className="mt-3 flex flex-wrap gap-2">
-               {members.map(member => (
-                 <span key={member} className="flex items-center gap-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-sm text-indigo-400">
-                   {member}
-                   <button 
-                     type="button" 
-                     onClick={() => handleRemoveMember(member)}
-                     disabled={loading}
-                     className="ml-1 text-indigo-300 hover:text-white"
-                   >×</button>
-                 </span>
-               ))}
-             </div>
-          )}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <AnimatePresence>
+              {members.map((email) => (
+                <motion.div
+                  key={email}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="flex items-center gap-2 rounded-full bg-brand-primary/10 border border-brand-primary/20 px-3 py-1 text-sm text-brand-primary"
+                >
+                  <span className="truncate max-w-[150px]">{email}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveMember(email)}
+                    className="rounded-full p-0.5 hover:bg-brand-primary/20"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
         </div>
 
-        <div className="mt-6 flex justify-end gap-3">
-          <button 
+        <div className="flex gap-3 pt-4">
+          <button
             type="button"
             onClick={onCancel}
-            disabled={loading}
-            className="rounded-lg px-4 py-2 font-medium text-slate-400 transition-colors hover:text-slate-200"
+            className="flex-1 rounded-xl border border-glass-border bg-transparent px-6 py-3 font-semibold text-text-secondary transition-all hover:bg-glass-bg hover:text-text-primary"
           >
             Cancel
           </button>
-          <button 
+          <button
             type="submit"
-            disabled={loading || !name.trim()}
-            className="flex items-center justify-center rounded-lg bg-indigo-600 px-6 py-2 font-medium text-white transition-all hover:bg-indigo-700 disabled:opacity-50"
+            disabled={loading}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-primary px-6 py-3 font-semibold text-white shadow-lg transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
           >
             {loading ? (
-                <div className="flex items-center gap-2">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-100/30 border-t-white"></div>
-                  <span>Creating...</span>
-                </div>
-            ) : 'Create Group'}
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+            ) : (
+              <>
+                <Send className="h-4 w-4" />
+                Create Group
+              </>
+            )}
           </button>
         </div>
       </form>
