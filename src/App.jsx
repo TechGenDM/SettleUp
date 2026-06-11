@@ -6,6 +6,7 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import GroupDetails from './pages/GroupDetails';
+import NotFound from './pages/NotFound';
 
 // If logged in → dashboard; if not → landing page
 const RootRedirect = () => {
@@ -22,6 +23,9 @@ function App() {
           <Route path="/login"      element={<Login />} />
           <Route path="/dashboard"  element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/groups/:id" element={<ProtectedRoute><GroupDetails /></ProtectedRoute>} />
+          
+          {/* Catch-all 404 route */}
+          <Route path="*"           element={<NotFound />} />
         </Routes>
       </Router>
     </AuthProvider>
